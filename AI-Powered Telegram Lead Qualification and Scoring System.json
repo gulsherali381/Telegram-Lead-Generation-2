@@ -1,0 +1,432 @@
+{
+  "name": "AI-Powered Telegram Lead Qualification and Scoring System",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "f38739e4-82f9-477a-88ae-54aa54105cc1",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1936,
+        720
+      ],
+      "webhookId": "74155f99-5207-4a01-be21-3b95b80c08fb",
+      "credentials": {
+        "telegramApi": {
+          "id": "m5hGIs9knzNQTkhX",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"User message: \" + $json.message.text + \"\\n\\nChat ID for responses: \" + $json.message.chat.id }}",
+        "options": {
+          "systemMessage": "You are a friendly lead qualification assistant for our company. Your task is to collect the following information from potential leads through natural conversation:\n\n1. Name\n2. Email\n3. Phone Number\n4. Company Name\n5. Industry\n6. Budget Range (Small: <$10k, Medium: $10k-$50k, Large: >$50k)\n7. Inquiry Details (what they are looking for)\n\nGuidelines:\n- Ask questions one at a time in a conversational manner\n- Be friendly, professional, and helpful\n- If the user provides multiple pieces of information at once, acknowledge them and ask for the remaining items\n- Once you have collected ALL information, use the Telegram Response Tool to send a final message thanking them and letting them know the sales team will be in touch soon\n- Format your final response with all collected data in this exact JSON structure:\n{\n  \"name\": \"value\",\n  \"email\": \"value\",\n  \"phone\": \"value\",\n  \"company\": \"value\",\n  \"industry\": \"value\",\n  \"budget\": \"value\",\n  \"inquiry\": \"value\"\n}\n\nIMPORTANT: When using the Telegram Response Tool, always use the chatId from the incoming message data (available as the numeric chat ID), NOT the user's email address.\n\nAlways use the Telegram Response Tool to communicate with the user."
+        }
+      },
+      "id": "0a654235-527b-4dc6-96fa-de693d9cb382",
+      "name": "Lead Qualification Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1656,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "4d5f4a59-ff50-40e9-929d-8da2f7940a61",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        -1712,
+        944
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YkW4dr2Fi5Wamwuu",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.message.chat.id }}"
+      },
+      "id": "2f1ebb72-01ab-4e32-b9ff-d560504386dd",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1584,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Calculate lead score based on budget, industry, and inquiry details\nconst item = $input.item.json;\n\n// Initialize score\nlet leadScore = 0;\n\n// Budget scoring (Small=10, Medium=20, Large=30)\nconst budget = (item.budget || '').toLowerCase();\nif (budget.includes('small') || budget.includes('low')) {\n  leadScore += 10;\n} else if (budget.includes('medium') || budget.includes('moderate')) {\n  leadScore += 20;\n} else if (budget.includes('large') || budget.includes('high') || budget.includes('big')) {\n  leadScore += 30;\n}\n\n// Industry bonus (+10 for tech/finance/healthcare)\nconst industry = (item.industry || '').toLowerCase();\nif (industry.includes('tech') || industry.includes('finance') || industry.includes('healthcare')) {\n  leadScore += 10;\n}\n\n// Inquiry length bonus (+5 if >50 chars, +10 if >100 chars)\nconst inquiry = item.inquiry || item.message || item.question || '';\nconst inquiryLength = inquiry.length;\nif (inquiryLength > 100) {\n  leadScore += 10;\n} else if (inquiryLength > 50) {\n  leadScore += 5;\n}\n\n// Return all input fields plus leadScore\nreturn {\n  ...item,\n  leadScore: leadScore\n};"
+      },
+      "id": "8dff0c47-2fb8-41d2-9165-25a3c9d7240a",
+      "name": "Calculate Lead Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "name",
+              "value": "={{ $json.output.name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "email",
+              "value": "={{ $json.output.email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "phone",
+              "value": "={{ $json.output.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "company",
+              "value": "={{ $json.output.company }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "industry",
+              "value": "={{ $json.output.industry }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "budget",
+              "value": "={{ $json.output.budget }}",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "inquiry",
+              "value": "={{ $json.output.inquiry }}",
+              "type": "string"
+            },
+            {
+              "id": "id-8",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-9",
+              "name": "chatId",
+              "value": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cc8b257b-8a31-4db8-99dd-41a933c120a5",
+      "name": "Format Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1040,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $('Calculate Lead Score').item.json.leadScore }}",
+              "rightValue": 30,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a2c51533-bbb8-4d1f-a0b7-a94f6f1f86d2",
+      "name": "Check Lead Score",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -592,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "leadTag",
+              "value": "High-Potential",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "priority",
+              "value": "Urgent",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "b06c8047-b3a4-4e33-9811-0cd6752ab588",
+      "name": "Tag High-Potential Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -368,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "leadTag",
+              "value": "Standard",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "priority",
+              "value": "Normal",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "6f915395-75fb-43a7-9e01-a90aeea98c20",
+      "name": "Tag Standard Lead",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -368,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "techgs114@gmail.com",
+        "subject": "Lead Worth 1000$",
+        "message": "={{ $('Send a text message').item.json.result.text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        720
+      ],
+      "id": "07d2e5b2-7ee4-451b-bd10-cef4a2d41019",
+      "name": "Send a message",
+      "webhookId": "3109b664-b924-48fc-a507-cbb960edd5b8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3DJboKIZVUiRCyzk",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1312,
+        720
+      ],
+      "id": "19ba369d-c25e-43fd-b233-cecc6749f289",
+      "name": "Send a text message",
+      "webhookId": "88b54596-f692-429c-a95e-6419f09460cb",
+      "credentials": {
+        "telegramApi": {
+          "id": "m5hGIs9knzNQTkhX",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Lead Qualification Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Lead Qualification Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Lead Qualification Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Qualification Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Calculate Lead Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Lead Score": {
+      "main": [
+        [
+          {
+            "node": "Check Lead Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Lead Score": {
+      "main": [
+        [
+          {
+            "node": "Tag High-Potential Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tag Standard Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag High-Potential Lead": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Standard Lead": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Format Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "578492f5-bab1-433a-b604-b4448eb8818c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aaa6add9c55f019134b7b0232888c0abd8814f15cf58568eeebf61a80fd57370"
+  },
+  "id": "v7WCLFWP4M87yzF2",
+  "tags": []
+}
